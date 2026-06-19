@@ -185,8 +185,27 @@ function startDirectDragging(event, item, box, editable) {
   const pointerId = event.pointerId;
   let dragging = false;
 
+  const cleanup = () => {
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", end);
+    window.removeEventListener("pointercancel", end);
+    window.removeEventListener("blur", cancel);
+
+    if (!dragging) return;
+    box.classList.remove("dragging");
+    editable.contentEditable = "true";
+    onSelectionChanged({ ...item });
+    onItemsChanged(textItems);
+  };
+
+  const cancel = () => cleanup();
+
   const move = (moveEvent) => {
     if (moveEvent.pointerId !== pointerId) return;
+    if (moveEvent.pointerType === "mouse" && moveEvent.buttons === 0) {
+      cleanup();
+      return;
+    }
     const deltaX = moveEvent.clientX - startX;
     const deltaY = moveEvent.clientY - startY;
     if (!dragging && Math.hypot(deltaX, deltaY) < 4) return;
@@ -208,21 +227,14 @@ function startDirectDragging(event, item, box, editable) {
 
   const end = (endEvent) => {
     if (endEvent.pointerId !== pointerId) return;
-    window.removeEventListener("pointermove", move);
-    window.removeEventListener("pointerup", end);
-    window.removeEventListener("pointercancel", end);
-
-    if (!dragging) return;
-    endEvent.preventDefault();
-    box.classList.remove("dragging");
-    editable.contentEditable = "true";
-    onSelectionChanged({ ...item });
-    onItemsChanged(textItems);
+    if (dragging) endEvent.preventDefault();
+    cleanup();
   };
 
   window.addEventListener("pointermove", move, { passive: false });
   window.addEventListener("pointerup", end);
   window.addEventListener("pointercancel", end);
+  window.addEventListener("blur", cancel);
 }
 
 function startDragging(event, item, box) {
@@ -238,6 +250,11 @@ function startDragging(event, item, box) {
   event.currentTarget.setPointerCapture(pointerId);
 
   const move = (moveEvent) => {
+    if (moveEvent.pointerId !== pointerId) return;
+    if (moveEvent.pointerType === "mouse" && moveEvent.buttons === 0) {
+      end();
+      return;
+    }
     const scale = getScale();
     item.x = Math.max(0, Math.min(originX + (moveEvent.clientX - startX) / scale, page.pdfWidth - item.width));
     item.y = Math.max(0, Math.min(originY + (moveEvent.clientY - startY) / scale, page.pdfHeight - item.fontSize * 1.4));

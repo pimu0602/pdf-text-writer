@@ -145,17 +145,61 @@ await evaluate(`(() => {
   return true;
 })()`);
 
+await evaluate(`(() => {
+  const editable = document.querySelector('.text-box-content');
+  const box = editable.closest('.text-box');
+  const rect = editable.getBoundingClientRect();
+  editable.dispatchEvent(new PointerEvent('pointerdown', {
+    bubbles: true,
+    pointerId: 24,
+    pointerType: 'mouse',
+    button: 0,
+    buttons: 1,
+    clientX: rect.left + 8,
+    clientY: rect.top + 8
+  }));
+  window.dispatchEvent(new PointerEvent('pointermove', {
+    bubbles: true,
+    pointerId: 24,
+    pointerType: 'mouse',
+    buttons: 1,
+    clientX: rect.left + 38,
+    clientY: rect.top + 28
+  }));
+  window.dispatchEvent(new PointerEvent('pointermove', {
+    bubbles: true,
+    pointerId: 24,
+    pointerType: 'mouse',
+    buttons: 0,
+    clientX: rect.left + 38,
+    clientY: rect.top + 28
+  }));
+  window.__releasedDragPosition = { left: parseFloat(box.style.left), top: parseFloat(box.style.top) };
+  window.dispatchEvent(new PointerEvent('pointermove', {
+    bubbles: true,
+    pointerId: 24,
+    pointerType: 'mouse',
+    buttons: 0,
+    clientX: rect.left + 138,
+    clientY: rect.top + 128
+  }));
+  window.__afterReleasedMove = { left: parseFloat(box.style.left), top: parseFloat(box.style.top) };
+  return true;
+})()`);
+
 const editorState = await evaluate(`(() => ({
   text: document.querySelector('.text-box-content')?.innerText,
   fontSize: document.querySelector('#fontSizeInput')?.value,
   color: document.querySelector('#fontColorInput')?.value,
   saveEnabled: !document.querySelector('#saveButton')?.disabled,
   movedByDirectDrag: window.__dragAfter.left > window.__dragBefore.left &&
-    window.__dragAfter.top > window.__dragBefore.top
+    window.__dragAfter.top > window.__dragBefore.top,
+  stopsWhenMouseReleased: window.__releasedDragPosition.left === window.__afterReleasedMove.left &&
+    window.__releasedDragPosition.top === window.__afterReleasedMove.top
 }))()`);
 
 if (editorState.text !== "山田太郎" || editorState.fontSize !== "20" || editorState.color !== "#c94d31" ||
-    !editorState.saveEnabled || !editorState.movedByDirectDrag) {
+    !editorState.saveEnabled || !editorState.movedByDirectDrag || !editorState.stopsWhenMouseReleased) {
   throw new Error(`編集状態が一致しません: ${JSON.stringify(editorState)}`);
 }
 
@@ -166,6 +210,17 @@ await send("Emulation.setDeviceMetricsOverride", {
   mobile: true
 });
 await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+const mobileScrollState = await evaluate(`(() => {
+  const layer = document.querySelector('.text-edit-layer');
+  const viewer = document.querySelector('.viewer');
+  return {
+    layerTouchAction: getComputedStyle(layer).touchAction,
+    viewerOverflowY: getComputedStyle(viewer).overflowY
+  };
+})()`);
+if (!mobileScrollState.layerTouchAction.includes('pan-y') || mobileScrollState.viewerOverflowY !== 'auto') {
+  throw new Error(`Mobile scrolling is disabled: ${JSON.stringify(mobileScrollState)}`);
+}
 const viewportLocked = await evaluate(`(() => {
   const editable = document.querySelector('.text-box-content');
   editable.blur();
@@ -296,6 +351,7 @@ if (!exportMeta || exportMeta.byteLength < 500 || exportMeta.fileName !== "smoke
 console.log(JSON.stringify({
   result: "PASS",
   editorState,
+  mobileScrollState,
   mobileSizeState,
   mobileColorState,
   mobileRotationRemoved,
