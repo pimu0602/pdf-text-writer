@@ -20,6 +20,8 @@ import {
   mountTextLayer,
   updateSelectedItem,
   rotateTextItemsClockwise,
+  lockMobileViewport,
+  restoreMobileViewport,
   deleteSelectedItem
 } from "./text-layer.js";
 import { exportPdf } from "./pdf-export.js";
@@ -31,8 +33,7 @@ const elements = {
   save: document.querySelector("#saveButton"),
   add: document.querySelector("#addTextButton"),
   fontSize: document.querySelector("#fontSizeInput"),
-  color: document.querySelector("#colorPickerButton"),
-  colorSwatch: document.querySelector("#colorSwatch"),
+  color: document.querySelector("#fontColorInput"),
   colorValue: document.querySelector("#colorValue"),
   bold: document.querySelector("#boldButton"),
   align: document.querySelector("#alignSelect"),
@@ -48,25 +49,10 @@ const elements = {
   mobileAdd: document.querySelector("#mobileAddButton"),
   mobileSize: document.querySelector("#mobileFontSizeInput"),
   mobileSizeControl: document.querySelector(".mobile-size-control"),
-  mobileColor: document.querySelector("#mobileColorButton"),
-  mobileColorSwatch: document.querySelector("#mobileColorSwatch"),
-  mobileRotate: document.querySelector("#mobileRotateButton"),
-  mobileDelete: document.querySelector("#mobileDeleteButton"),
-  colorDialog: document.querySelector("#colorDialog"),
-  colorDialogClose: document.querySelector("#colorDialogClose"),
-  colorPalette: document.querySelector("#colorPalette"),
-  colorHex: document.querySelector("#colorHexInput"),
-  customColorPreview: document.querySelector("#customColorPreview"),
-  applyColor: document.querySelector("#applyColorButton")
+  mobileColorLabel: document.querySelector("#mobileColorLabel"),
+  mobileColor: document.querySelector("#mobileColorInput"),
+  mobileDelete: document.querySelector("#mobileDeleteButton")
 };
-
-const paletteColors = [
-  "#000000", "#172033", "#374151", "#6B7280", "#9CA3AF", "#D1D5DB", "#E5E7EB", "#FFFFFF",
-  "#7F1D1D", "#B91C1C", "#EF4444", "#F97316", "#F59E0B", "#EAB308", "#84CC16", "#16A34A",
-  "#064E3B", "#0F766E", "#06B6D4", "#0284C7", "#1D4ED8", "#4338CA", "#7E22CE", "#A21CAF",
-  "#831843", "#BE185D", "#F43F5E", "#C94D31", "#D97706", "#65A30D", "#059669", "#0891B2",
-  "#60A5FA", "#818CF8", "#C084FC", "#F472B6", "#FCA5A5", "#FDBA74", "#FDE047", "#86EFAC"
-];
 
 let toastTimer = null;
 let isBusy = false;
@@ -105,14 +91,16 @@ function syncSelection(item) {
   elements.mobileSize.disabled = !enabled;
   elements.mobileSizeControl.setAttribute("aria-disabled", String(!enabled));
   elements.mobileColor.disabled = !enabled;
+  elements.mobileColorLabel.setAttribute("aria-disabled", String(!enabled));
   elements.mobileDelete.disabled = !enabled;
 
   if (!item) return;
   elements.fontSize.value = String(item.fontSize);
   elements.mobileSize.value = String(item.fontSize);
+  elements.color.value = item.color;
+  elements.mobileColor.value = item.color;
   elements.colorValue.textContent = item.color.toUpperCase();
-  elements.colorSwatch.style.background = item.color;
-  elements.mobileColorSwatch.style.background = item.color;
+  elements.mobileColorLabel.querySelector("span").style.background = item.color;
   elements.bold.setAttribute("aria-pressed", String(item.bold));
   elements.align.value = item.align;
 }
@@ -124,7 +112,6 @@ function setDocumentControls(enabled) {
   elements.zoomOut.disabled = !enabled || isBusy;
   elements.rotate.disabled = !enabled || isBusy;
   elements.mobileAdd.disabled = !enabled || isBusy;
-  elements.mobileRotate.disabled = !enabled || isBusy;
   syncSelection(getSelectedItem());
 }
 
@@ -188,74 +175,24 @@ elements.fontSize.addEventListener("change", () => updateFontSize(elements.fontS
 elements.mobileSize.addEventListener("change", () => updateFontSize(elements.mobileSize.value));
 
 function updateColor(value) {
-  const normalized = value.toUpperCase();
-  elements.colorValue.textContent = normalized;
-  elements.colorSwatch.style.background = normalized;
-  elements.mobileColorSwatch.style.background = normalized;
-  elements.colorHex.value = normalized;
-  elements.customColorPreview.style.background = normalized;
-  elements.colorPalette.querySelectorAll(".color-chip").forEach((chip) => {
-    chip.setAttribute("aria-pressed", String(chip.dataset.color === normalized));
-  });
-  updateSelectedItem({ color: normalized });
+  elements.color.value = value;
+  elements.mobileColor.value = value;
+  elements.colorValue.textContent = value.toUpperCase();
+  elements.mobileColorLabel.querySelector("span").style.background = value;
+  updateSelectedItem({ color: value });
 }
-
-function openColorDialog() {
-  const item = getSelectedItem();
-  if (!item) return;
-  elements.colorHex.value = item.color.toUpperCase();
-  elements.customColorPreview.style.background = item.color;
-  elements.colorPalette.querySelectorAll(".color-chip").forEach((chip) => {
-    chip.setAttribute("aria-pressed", String(chip.dataset.color === item.color.toUpperCase()));
-  });
-  if (typeof elements.colorDialog.showModal === "function") elements.colorDialog.showModal();
-  else elements.colorDialog.setAttribute("open", "");
-}
-
-function closeColorDialog() {
-  if (typeof elements.colorDialog.close === "function") elements.colorDialog.close();
-  else elements.colorDialog.removeAttribute("open");
-}
-
-paletteColors.forEach((color) => {
-  const chip = document.createElement("button");
-  chip.type = "button";
-  chip.className = "color-chip";
-  chip.dataset.color = color;
-  chip.style.setProperty("--chip-color", color);
-  const value = parseInt(color.slice(1), 16);
-  const red = (value >> 16) & 255;
-  const green = (value >> 8) & 255;
-  const blue = value & 255;
-  if ((red * 299 + green * 587 + blue * 114) / 1000 > 170) chip.style.setProperty("--check-color", "#172033");
-  chip.setAttribute("aria-label", color);
-  chip.setAttribute("aria-pressed", "false");
-  chip.addEventListener("click", () => {
-    updateColor(color);
-    closeColorDialog();
-  });
-  elements.colorPalette.append(chip);
+elements.color.addEventListener("input", () => updateColor(elements.color.value));
+elements.mobileColor.addEventListener("input", () => {
+  updateColor(elements.mobileColor.value);
+  restoreMobileViewport();
 });
-
-elements.color.addEventListener("click", openColorDialog);
-elements.mobileColor.addEventListener("click", openColorDialog);
-elements.colorDialogClose.addEventListener("click", closeColorDialog);
-elements.colorDialog.addEventListener("click", (event) => {
-  if (event.target === elements.colorDialog) closeColorDialog();
-});
-elements.colorHex.addEventListener("input", () => {
-  const value = elements.colorHex.value.trim();
-  if (/^#[0-9a-f]{6}$/i.test(value)) elements.customColorPreview.style.background = value;
-});
-elements.applyColor.addEventListener("click", () => {
-  let value = elements.colorHex.value.trim();
-  if (!value.startsWith("#")) value = `#${value}`;
-  if (!/^#[0-9a-f]{6}$/i.test(value)) {
-    showToast("6桁のカラーコードを入力してください");
-    return;
-  }
-  updateColor(value);
-  closeColorDialog();
+elements.mobileColor.addEventListener("change", restoreMobileViewport);
+elements.mobileColor.addEventListener("blur", restoreMobileViewport);
+elements.mobileColor.addEventListener("focus", lockMobileViewport);
+elements.mobileColorLabel.addEventListener("pointerdown", lockMobileViewport);
+window.addEventListener("focus", restoreMobileViewport);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) restoreMobileViewport();
 });
 
 elements.bold.addEventListener("click", () => {
@@ -303,7 +240,6 @@ async function rotatePdf() {
   }
 }
 elements.rotate.addEventListener("click", rotatePdf);
-elements.mobileRotate.addEventListener("click", rotatePdf);
 
 elements.save.addEventListener("click", async () => {
   if (isBusy || !hasPdf()) return;

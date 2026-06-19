@@ -151,7 +151,7 @@ function createTextBox(item) {
   return box;
 }
 
-function lockMobileViewport() {
+export function lockMobileViewport() {
   const isMobile = window.matchMedia("(max-width: 760px)").matches &&
     window.matchMedia("(pointer: coarse)").matches;
   if (!isMobile || !viewportMeta) return;
@@ -163,7 +163,7 @@ function lockMobileViewport() {
   mobileViewportLocked = true;
 }
 
-function restoreMobileViewport() {
+export function restoreMobileViewport() {
   if (!mobileViewportLocked || !viewportMeta) return;
   clearTimeout(viewportRestoreTimer);
   viewportMeta.setAttribute(

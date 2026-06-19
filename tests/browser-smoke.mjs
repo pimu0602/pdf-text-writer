@@ -106,8 +106,8 @@ await evaluate(`(() => {
   const size = document.querySelector('#fontSizeInput');
   size.value = '20';
   size.dispatchEvent(new Event('change', { bubbles: true }));
-  document.querySelector('#colorPickerButton').click();
-  document.querySelector('.color-chip[data-color="#C94D31"]').click();
+  document.querySelector('#fontColorInput').value = '#c94d31';
+  document.querySelector('#fontColorInput').dispatchEvent(new Event('input', { bubbles: true }));
   return true;
 })()`);
 
@@ -148,13 +148,13 @@ await evaluate(`(() => {
 const editorState = await evaluate(`(() => ({
   text: document.querySelector('.text-box-content')?.innerText,
   fontSize: document.querySelector('#fontSizeInput')?.value,
-  color: document.querySelector('#colorValue')?.textContent,
+  color: document.querySelector('#fontColorInput')?.value,
   saveEnabled: !document.querySelector('#saveButton')?.disabled,
   movedByDirectDrag: window.__dragAfter.left > window.__dragBefore.left &&
     window.__dragAfter.top > window.__dragBefore.top
 }))()`);
 
-if (editorState.text !== "山田太郎" || editorState.fontSize !== "20" || editorState.color !== "#C94D31" ||
+if (editorState.text !== "山田太郎" || editorState.fontSize !== "20" || editorState.color !== "#c94d31" ||
     !editorState.saveEnabled || !editorState.movedByDirectDrag) {
   throw new Error(`編集状態が一致しません: ${JSON.stringify(editorState)}`);
 }
@@ -196,20 +196,49 @@ const mobileSizeState = await evaluate(`(() => {
 })()`);
 const mobileColorState = await evaluate(`(() => {
   const meta = document.querySelector('meta[name="viewport"]');
-  const before = meta.content;
-  document.querySelector('#mobileColorButton').click();
-  const state = {
-    dialogOpen: document.querySelector('#colorDialog').open,
-    hasNativeColorInput: Boolean(document.querySelector('input[type="color"]')),
-    viewportUnchanged: meta.content === before
+  const label = document.querySelector('#mobileColorLabel');
+  const input = document.querySelector('#mobileColorInput');
+  label.dispatchEvent(new PointerEvent('pointerdown', {
+    bubbles: true,
+    pointerId: 23,
+    pointerType: 'touch',
+    button: 0,
+    clientX: 180,
+    clientY: 780
+  }));
+  input.focus();
+  const locked = meta.content.includes('maximum-scale=1');
+  input.value = '#ff8a95';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  input.blur();
+  return {
+    hasNativeColorInput: input.type === 'color',
+    locked,
+    selected: input.value
   };
-  document.querySelector('#colorDialogClose').click();
-  return state;
 })()`);
+await new Promise((resolve) => setTimeout(resolve, 450));
+mobileColorState.restored = await evaluate(
+  "!document.querySelector('meta[name=\"viewport\"]').content.includes('maximum-scale=1')"
+);
 if (!viewportLocked || !viewportRestored || mobileSizeState.mobile !== "28" || mobileSizeState.desktop !== "28" ||
-    !mobileColorState.dialogOpen || mobileColorState.hasNativeColorInput || !mobileColorState.viewportUnchanged) {
+    !mobileColorState.hasNativeColorInput || !mobileColorState.locked || !mobileColorState.restored ||
+    mobileColorState.selected !== "#ff8a95") {
   throw new Error(`モバイル操作の検証に失敗しました: ${JSON.stringify({ viewportLocked, viewportRestored, mobileSizeState, mobileColorState })}`);
 }
+
+const mobileRotationRemoved = await evaluate(
+  "!document.querySelector('#mobileRotateButton') && document.querySelector('.mobile-toolbar').children.length === 4"
+);
+if (!mobileRotationRemoved) throw new Error("スマホ版の回転操作が残っています。");
+await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+await send("Emulation.setDeviceMetricsOverride", {
+  width: 1200,
+  height: 900,
+  deviceScaleFactor: 1,
+  mobile: false
+});
 
 const rotationBefore = await evaluate(`(() => {
   const page = document.querySelector('.pdf-page-shell');
@@ -222,16 +251,14 @@ const rotationAfter = await evaluate(`(() => {
   return {
     width: parseFloat(page.style.width),
     height: parseFloat(page.style.height),
-    viewerWidth: document.querySelector('#viewer').clientWidth,
     text: document.querySelector('.text-box-content')?.innerText
   };
 })()`);
-const rotationPassed = rotationAfter.width <= rotationAfter.viewerWidth - 20 &&
-  rotationAfter.width > rotationAfter.height && rotationAfter.text === '山田太郎';
+const rotationPassed = Math.abs(rotationAfter.width - rotationBefore.height) < 1 &&
+  Math.abs(rotationAfter.height - rotationBefore.width) < 1 && rotationAfter.text === '山田太郎';
 if (!rotationPassed) {
   throw new Error(`PDF回転の検証に失敗しました: ${JSON.stringify({ rotationBefore, rotationAfter })}`);
 }
-await send("Emulation.setTouchEmulationEnabled", { enabled: false });
 await send("Emulation.clearDeviceMetricsOverride");
 
 await evaluate(`(() => {
@@ -271,6 +298,7 @@ console.log(JSON.stringify({
   editorState,
   mobileSizeState,
   mobileColorState,
+  mobileRotationRemoved,
   rotationPassed,
   exportMeta,
   download: downloads[0] || "headless-browser-policy-blocked"
