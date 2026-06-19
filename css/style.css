@@ -209,10 +209,13 @@ select { width: 100%; height: 41px; padding: 0 11px; color: var(--ink); border: 
 .page-label { position: absolute; top: -21px; left: 0; color: #747a78; font-size: 9px; font-weight: 700; letter-spacing: .6px; }
 .text-edit-layer { position: absolute; inset: 0; overflow: hidden; touch-action: none; }
 .text-edit-layer.add-mode { cursor: crosshair; background: rgba(223, 95, 63, .025); }
-.text-box { position: absolute; min-height: 25px; display: flex; align-items: flex-start; border: 1px solid transparent; border-radius: 3px; cursor: text; touch-action: none; }
+.text-box { position: absolute; min-height: 25px; display: flex; align-items: flex-start; border: 1px solid transparent; border-radius: 3px; cursor: move; touch-action: none; }
 .text-box:hover { border-color: rgba(223, 95, 63, .38); }
 .text-box.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(223, 95, 63, .12); background: rgba(255,255,255,.45); }
-.text-box-content { width: 100%; min-width: 28px; min-height: 1.35em; padding: 2px 4px; outline: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.32; }
+.text-box-content { width: 100%; min-width: 28px; min-height: 1.35em; padding: 2px 4px; outline: 0; cursor: move; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.32; }
+.text-box-content:focus { cursor: text; }
+.text-box.dragging { opacity: .86; cursor: grabbing; user-select: none; }
+.text-box.dragging .text-box-content { cursor: grabbing; user-select: none; }
 .drag-handle { position: absolute; top: -22px; left: -1px; height: 20px; display: none; align-items: center; gap: 3px; padding: 0 6px; color: #fff; border: 0; border-radius: 4px 4px 0 0; background: var(--accent); cursor: grab; font-size: 9px; font-weight: 700; touch-action: none; }
 .drag-handle::before { content: "✥"; font-size: 10px; }
 .drag-handle:active { cursor: grabbing; }

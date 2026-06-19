@@ -6,6 +6,10 @@ let getPageInfo = () => null;
 let onSelectionChanged = () => {};
 let onModeChanged = () => {};
 let onItemsChanged = () => {};
+const viewportMeta = document.querySelector('meta[name="viewport"]');
+const defaultViewportContent = viewportMeta?.getAttribute("content") || "width=device-width, initial-scale=1";
+let mobileViewportLocked = false;
+let viewportRestoreTimer = null;
 
 export function configureTextLayer(options) {
   getScale = options.getScale;
@@ -125,7 +129,15 @@ function createTextBox(item) {
   box.addEventListener("pointerdown", (event) => {
     event.stopPropagation();
     selectItem(item.id);
+    if (event.pointerType === "mouse" && event.button === 0 && !event.target.closest(".drag-handle")) {
+      startDirectDragging(event, item, box, editable);
+    }
   });
+  editable.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "mouse") lockMobileViewport();
+  });
+  editable.addEventListener("focus", lockMobileViewport);
+  editable.addEventListener("blur", restoreMobileViewport);
   editable.addEventListener("input", () => {
     item.text = editable.innerText.replace(/\r/g, "");
     onItemsChanged(textItems);
@@ -137,6 +149,80 @@ function createTextBox(item) {
 
   box.append(handle, editable);
   return box;
+}
+
+function lockMobileViewport() {
+  const isMobile = window.matchMedia("(max-width: 760px)").matches &&
+    window.matchMedia("(pointer: coarse)").matches;
+  if (!isMobile || !viewportMeta) return;
+  clearTimeout(viewportRestoreTimer);
+  viewportMeta.setAttribute(
+    "content",
+    "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+  );
+  mobileViewportLocked = true;
+}
+
+function restoreMobileViewport() {
+  if (!mobileViewportLocked || !viewportMeta) return;
+  clearTimeout(viewportRestoreTimer);
+  viewportMeta.setAttribute(
+    "content",
+    "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+  );
+  viewportRestoreTimer = window.setTimeout(() => {
+    viewportMeta.setAttribute("content", defaultViewportContent);
+    mobileViewportLocked = false;
+  }, 320);
+}
+
+function startDirectDragging(event, item, box, editable) {
+  const startX = event.clientX;
+  const startY = event.clientY;
+  const originX = item.x;
+  const originY = item.y;
+  const page = getPageInfo(item.pageIndex);
+  const pointerId = event.pointerId;
+  let dragging = false;
+
+  const move = (moveEvent) => {
+    if (moveEvent.pointerId !== pointerId) return;
+    const deltaX = moveEvent.clientX - startX;
+    const deltaY = moveEvent.clientY - startY;
+    if (!dragging && Math.hypot(deltaX, deltaY) < 4) return;
+
+    if (!dragging) {
+      dragging = true;
+      box.classList.add("dragging");
+      editable.contentEditable = "false";
+      window.getSelection()?.removeAllRanges();
+    }
+
+    moveEvent.preventDefault();
+    const scale = getScale();
+    item.x = Math.max(0, Math.min(originX + deltaX / scale, page.pdfWidth - item.width));
+    item.y = Math.max(0, Math.min(originY + deltaY / scale, page.pdfHeight - item.fontSize * 1.4));
+    box.style.left = `${item.x * scale}px`;
+    box.style.top = `${item.y * scale}px`;
+  };
+
+  const end = (endEvent) => {
+    if (endEvent.pointerId !== pointerId) return;
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", end);
+    window.removeEventListener("pointercancel", end);
+
+    if (!dragging) return;
+    endEvent.preventDefault();
+    box.classList.remove("dragging");
+    editable.contentEditable = "true";
+    onSelectionChanged({ ...item });
+    onItemsChanged(textItems);
+  };
+
+  window.addEventListener("pointermove", move, { passive: false });
+  window.addEventListener("pointerup", end);
+  window.addEventListener("pointercancel", end);
 }
 
 function startDragging(event, item, box) {

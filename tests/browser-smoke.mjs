@@ -111,15 +111,84 @@ await evaluate(`(() => {
   return true;
 })()`);
 
+await evaluate(`(() => {
+  const editable = document.querySelector('.text-box-content');
+  const box = editable.closest('.text-box');
+  const rect = editable.getBoundingClientRect();
+  window.__dragBefore = { left: parseFloat(box.style.left), top: parseFloat(box.style.top) };
+  editable.dispatchEvent(new PointerEvent('pointerdown', {
+    bubbles: true,
+    pointerId: 21,
+    pointerType: 'mouse',
+    button: 0,
+    buttons: 1,
+    clientX: rect.left + 8,
+    clientY: rect.top + 8
+  }));
+  window.dispatchEvent(new PointerEvent('pointermove', {
+    bubbles: true,
+    pointerId: 21,
+    pointerType: 'mouse',
+    buttons: 1,
+    clientX: rect.left + 68,
+    clientY: rect.top + 48
+  }));
+  window.dispatchEvent(new PointerEvent('pointerup', {
+    bubbles: true,
+    pointerId: 21,
+    pointerType: 'mouse',
+    button: 0,
+    clientX: rect.left + 68,
+    clientY: rect.top + 48
+  }));
+  window.__dragAfter = { left: parseFloat(box.style.left), top: parseFloat(box.style.top) };
+  return true;
+})()`);
+
 const editorState = await evaluate(`(() => ({
   text: document.querySelector('.text-box-content')?.innerText,
   fontSize: document.querySelector('#fontSizeInput')?.value,
   color: document.querySelector('#fontColorInput')?.value,
-  saveEnabled: !document.querySelector('#saveButton')?.disabled
+  saveEnabled: !document.querySelector('#saveButton')?.disabled,
+  movedByDirectDrag: window.__dragAfter.left > window.__dragBefore.left &&
+    window.__dragAfter.top > window.__dragBefore.top
 }))()`);
 
-if (editorState.text !== "山田太郎" || editorState.fontSize !== "20" || editorState.color !== "#c94d31" || !editorState.saveEnabled) {
+if (editorState.text !== "山田太郎" || editorState.fontSize !== "20" || editorState.color !== "#c94d31" ||
+    !editorState.saveEnabled || !editorState.movedByDirectDrag) {
   throw new Error(`編集状態が一致しません: ${JSON.stringify(editorState)}`);
+}
+
+await send("Emulation.setDeviceMetricsOverride", {
+  width: 390,
+  height: 844,
+  deviceScaleFactor: 1,
+  mobile: true
+});
+await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+const viewportLocked = await evaluate(`(() => {
+  const editable = document.querySelector('.text-box-content');
+  editable.blur();
+  editable.dispatchEvent(new PointerEvent('pointerdown', {
+    bubbles: true,
+    pointerId: 22,
+    pointerType: 'touch',
+    button: 0,
+    clientX: 100,
+    clientY: 100
+  }));
+  editable.focus();
+  return document.querySelector('meta[name="viewport"]').content.includes('maximum-scale=1');
+})()`);
+await evaluate("document.querySelector('.text-box-content').blur(); true");
+await new Promise((resolve) => setTimeout(resolve, 450));
+const viewportRestored = await evaluate(
+  "!document.querySelector('meta[name=\"viewport\"]').content.includes('maximum-scale=1')"
+);
+await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+await send("Emulation.clearDeviceMetricsOverride");
+if (!viewportLocked || !viewportRestored) {
+  throw new Error(`モバイル表示倍率の制御に失敗しました: ${JSON.stringify({ viewportLocked, viewportRestored })}`);
 }
 
 await evaluate(`(() => {
