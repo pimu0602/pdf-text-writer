@@ -51,6 +51,7 @@ const elements = {
   mobileSizeControl: document.querySelector(".mobile-size-control"),
   mobileColorLabel: document.querySelector("#mobileColorLabel"),
   mobileColor: document.querySelector("#mobileColorInput"),
+  mobileRotate: document.querySelector("#mobileRotateButton"),
   mobileDelete: document.querySelector("#mobileDeleteButton")
 };
 
@@ -112,6 +113,7 @@ function setDocumentControls(enabled) {
   elements.zoomOut.disabled = !enabled || isBusy;
   elements.rotate.disabled = !enabled || isBusy;
   elements.mobileAdd.disabled = !enabled || isBusy;
+  elements.mobileRotate.disabled = !enabled || isBusy;
   syncSelection(getSelectedItem());
 }
 
@@ -240,6 +242,7 @@ async function rotatePdf() {
   }
 }
 elements.rotate.addEventListener("click", rotatePdf);
+elements.mobileRotate.addEventListener("click", rotatePdf);
 
 elements.save.addEventListener("click", async () => {
   if (isBusy || !hasPdf()) return;

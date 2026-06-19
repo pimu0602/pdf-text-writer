@@ -283,10 +283,33 @@ if (!viewportLocked || !viewportRestored || mobileSizeState.mobile !== "28" || m
   throw new Error(`モバイル操作の検証に失敗しました: ${JSON.stringify({ viewportLocked, viewportRestored, mobileSizeState, mobileColorState })}`);
 }
 
-const mobileRotationRemoved = await evaluate(
-  "!document.querySelector('#mobileRotateButton') && document.querySelector('.mobile-toolbar').children.length === 4"
-);
-if (!mobileRotationRemoved) throw new Error("スマホ版の回転操作が残っています。");
+const mobileRotationBefore = await evaluate(`(() => {
+  const page = document.querySelector('.pdf-page-shell');
+  const viewer = document.querySelector('.viewer');
+  return {
+    width: parseFloat(page.style.width),
+    height: parseFloat(page.style.height),
+    viewerWidth: viewer.clientWidth,
+    buttonCount: document.querySelector('.mobile-toolbar').children.length,
+    buttonEnabled: !document.querySelector('#mobileRotateButton').disabled
+  };
+})()`);
+await evaluate("document.querySelector('#mobileRotateButton').click(); true");
+await waitFor("document.querySelector('#statusMessage')?.textContent === 'PDFを右へ90度回転しました'");
+const mobileRotationAfter = await evaluate(`(() => {
+  const page = document.querySelector('.pdf-page-shell');
+  return {
+    width: parseFloat(page.style.width),
+    height: parseFloat(page.style.height),
+    text: document.querySelector('.text-box-content')?.innerText
+  };
+})()`);
+const mobileRotationPassed = mobileRotationBefore.buttonCount === 5 && mobileRotationBefore.buttonEnabled &&
+  mobileRotationAfter.width <= mobileRotationBefore.viewerWidth - 20 &&
+  mobileRotationAfter.width > mobileRotationAfter.height && mobileRotationAfter.text === '山田太郎';
+if (!mobileRotationPassed) {
+  throw new Error(`スマホ版PDF回転の検証に失敗しました: ${JSON.stringify({ mobileRotationBefore, mobileRotationAfter })}`);
+}
 await send("Emulation.setTouchEmulationEnabled", { enabled: false });
 await send("Emulation.setDeviceMetricsOverride", {
   width: 1200,
@@ -344,7 +367,7 @@ for (let attempt = 0; attempt < 40; attempt += 1) {
 }
 const exportMeta = await evaluate("window.__pdfTextWriterExport");
 if (!exportMeta || exportMeta.byteLength < 500 || exportMeta.fileName !== "smoke-sample-text.pdf" ||
-    exportMeta.rotations?.[0] !== 90) {
+    exportMeta.rotations?.[0] !== 180) {
   throw new Error(`PDFバイト列を確認できません: ${JSON.stringify(exportMeta)}`);
 }
 
@@ -354,7 +377,7 @@ console.log(JSON.stringify({
   mobileScrollState,
   mobileSizeState,
   mobileColorState,
-  mobileRotationRemoved,
+  mobileRotationPassed,
   rotationPassed,
   exportMeta,
   download: downloads[0] || "headless-browser-policy-blocked"
