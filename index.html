@@ -87,6 +87,9 @@
           <output id="zoomValue">100%</output>
           <button id="zoomInButton" class="icon-tool" type="button" disabled aria-label="拡大">＋</button>
         </div>
+        <button id="rotateButton" class="rotate-button" type="button" disabled title="全ページを右へ90度回転">
+          <span aria-hidden="true">↻</span> 回転
+        </button>
         <button id="deleteButton" class="delete-button" type="button" disabled>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V4.5h8V7m-11 0h14M7 7l.75 12h8.5L17 7M10 10v6m4-6v6"/></svg>
           削除
@@ -129,8 +132,12 @@
 
   <nav class="mobile-toolbar" aria-label="モバイル編集ツール">
     <button id="mobileAddButton" type="button" disabled><span>＋</span>文字追加</button>
-    <button id="mobileSizeButton" type="button" disabled><span>A</span>サイズ</button>
+    <label class="mobile-size-control" aria-disabled="true">
+      <span class="mobile-size-field"><input id="mobileFontSizeInput" type="number" min="6" max="120" step="1" value="16" disabled><i>pt</i></span>
+      文字サイズ
+    </label>
     <label id="mobileColorLabel" class="mobile-color" aria-disabled="true"><span></span>文字色<input id="mobileColorInput" type="color" value="#172033" disabled></label>
+    <button id="mobileRotateButton" type="button" disabled><span>↻</span>回転</button>
     <button id="mobileDeleteButton" type="button" disabled><span>⌫</span>削除</button>
   </nav>
 

@@ -185,10 +185,39 @@ await new Promise((resolve) => setTimeout(resolve, 450));
 const viewportRestored = await evaluate(
   "!document.querySelector('meta[name=\"viewport\"]').content.includes('maximum-scale=1')"
 );
+const mobileSizeState = await evaluate(`(() => {
+  const input = document.querySelector('#mobileFontSizeInput');
+  input.value = '28';
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  return {
+    mobile: input.value,
+    desktop: document.querySelector('#fontSizeInput').value
+  };
+})()`);
 await send("Emulation.setTouchEmulationEnabled", { enabled: false });
 await send("Emulation.clearDeviceMetricsOverride");
-if (!viewportLocked || !viewportRestored) {
-  throw new Error(`モバイル表示倍率の制御に失敗しました: ${JSON.stringify({ viewportLocked, viewportRestored })}`);
+if (!viewportLocked || !viewportRestored || mobileSizeState.mobile !== "28" || mobileSizeState.desktop !== "28") {
+  throw new Error(`モバイル操作の検証に失敗しました: ${JSON.stringify({ viewportLocked, viewportRestored, mobileSizeState })}`);
+}
+
+const rotationBefore = await evaluate(`(() => {
+  const page = document.querySelector('.pdf-page-shell');
+  return { width: parseFloat(page.style.width), height: parseFloat(page.style.height) };
+})()`);
+await evaluate("document.querySelector('#rotateButton').click(); true");
+await waitFor("document.querySelector('#statusMessage')?.textContent === 'PDFを右へ90度回転しました'");
+const rotationAfter = await evaluate(`(() => {
+  const page = document.querySelector('.pdf-page-shell');
+  return {
+    width: parseFloat(page.style.width),
+    height: parseFloat(page.style.height),
+    text: document.querySelector('.text-box-content')?.innerText
+  };
+})()`);
+const rotationPassed = Math.abs(rotationAfter.width - rotationBefore.height) < 1 &&
+  Math.abs(rotationAfter.height - rotationBefore.width) < 1 && rotationAfter.text === '山田太郎';
+if (!rotationPassed) {
+  throw new Error(`PDF回転の検証に失敗しました: ${JSON.stringify({ rotationBefore, rotationAfter })}`);
 }
 
 await evaluate(`(() => {
@@ -218,13 +247,16 @@ for (let attempt = 0; attempt < 40; attempt += 1) {
   await new Promise((resolve) => setTimeout(resolve, 250));
 }
 const exportMeta = await evaluate("window.__pdfTextWriterExport");
-if (!exportMeta || exportMeta.byteLength < 500 || exportMeta.fileName !== "smoke-sample-text.pdf") {
+if (!exportMeta || exportMeta.byteLength < 500 || exportMeta.fileName !== "smoke-sample-text.pdf" ||
+    exportMeta.rotations?.[0] !== 90) {
   throw new Error(`PDFバイト列を確認できません: ${JSON.stringify(exportMeta)}`);
 }
 
 console.log(JSON.stringify({
   result: "PASS",
   editorState,
+  mobileSizeState,
+  rotationPassed,
   exportMeta,
   download: downloads[0] || "headless-browser-policy-blocked"
 }, null, 2));

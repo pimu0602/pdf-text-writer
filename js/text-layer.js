@@ -275,6 +275,27 @@ export function updateSelectedItem(patch) {
   onItemsChanged(textItems);
 }
 
+export function rotateTextItemsClockwise(pageInfoList) {
+  textItems.forEach((item) => {
+    const page = pageInfoList[item.pageIndex];
+    if (!page) return;
+
+    const textHeight = item.fontSize * 1.32;
+    const centerX = item.x + item.width / 2;
+    const centerY = item.y + textHeight / 2;
+    const nextPageWidth = page.pdfHeight;
+    const nextPageHeight = page.pdfWidth;
+    const nextCenterX = page.pdfHeight - centerY;
+    const nextCenterY = centerX;
+
+    item.width = Math.min(item.width, nextPageWidth);
+    item.x = Math.max(0, Math.min(nextCenterX - item.width / 2, nextPageWidth - item.width));
+    item.y = Math.max(0, Math.min(nextCenterY - textHeight / 2, nextPageHeight - textHeight));
+  });
+  onSelectionChanged(getSelectedItem());
+  onItemsChanged(textItems);
+}
+
 export function deleteSelectedItem() {
   const index = textItems.findIndex((item) => item.id === selectedId);
   if (index < 0) return false;

@@ -5,6 +5,7 @@ let originalPdfBytes = null;
 let originalFileName = "document.pdf";
 let currentScale = 1;
 let pageInfo = [];
+let pageRotations = [];
 let viewerElement = null;
 let renderLayerCallback = null;
 let activeRenderId = 0;
@@ -27,6 +28,7 @@ export async function loadPdf(arrayBuffer, fileName, onRenderLayer) {
 
   const loadingTask = window.pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) });
   pdfDocument = await loadingTask.promise;
+  pageRotations = Array(pdfDocument.numPages).fill(0);
 
   const firstPage = await pdfDocument.getPage(1);
   const baseViewport = firstPage.getViewport({ scale: 1 });
@@ -50,8 +52,12 @@ export async function renderPdfPages() {
     if (renderId !== activeRenderId) return;
 
     const page = await pdfDocument.getPage(pageNumber);
-    const baseViewport = page.getViewport({ scale: 1 });
-    const viewport = page.getViewport({ scale: currentScale });
+    const rotationDelta = pageRotations[pageNumber - 1] || 0;
+    const rotation = ((page.rotate + rotationDelta) % 360 + 360) % 360;
+    const baseViewport = page.getViewport({ scale: 1, rotation });
+    const viewport = page.getViewport({ scale: currentScale, rotation });
+    const rawWidth = Math.abs(page.view[2] - page.view[0]);
+    const rawHeight = Math.abs(page.view[3] - page.view[1]);
     const outputScale = Math.min(window.devicePixelRatio || 1, 2);
 
     const shell = document.createElement("article");
@@ -90,6 +96,10 @@ export async function renderPdfPages() {
       pageIndex: pageNumber - 1,
       pdfWidth: baseViewport.width,
       pdfHeight: baseViewport.height,
+      rawWidth,
+      rawHeight,
+      rotation,
+      rotationDelta,
       displayedWidth: viewport.width,
       displayedHeight: viewport.height
     });
@@ -109,8 +119,15 @@ export async function setZoom(nextScale) {
   return currentScale;
 }
 
+export async function rotateClockwise() {
+  if (!pdfDocument) return;
+  pageRotations = pageRotations.map((rotation) => (rotation + 90) % 360);
+  await renderPdfPages();
+}
+
 export function getScale() { return currentScale; }
 export function getPageInfo(pageIndex) { return pageInfo[pageIndex] || null; }
+export function getAllPageInfo() { return pageInfo.map((info) => ({ ...info })); }
 export function getOriginalPdfBytes() { return originalPdfBytes?.slice(0) || null; }
 export function getOriginalFileName() { return originalFileName; }
 export function hasPdf() { return Boolean(pdfDocument); }

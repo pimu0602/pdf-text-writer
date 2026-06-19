@@ -170,13 +170,16 @@ select { width: 100%; height: 41px; padding: 0 11px; color: var(--ink); border: 
 .icon-tool[aria-pressed="true"] { color: #fff; border-color: var(--navy); background: var(--navy); }
 .text-icon { font-family: Georgia, serif; font-weight: 800; }
 .tool-divider { height: 1px; margin: 24px 0 18px; background: var(--line); }
-.secondary-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.secondary-tools { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .zoom-tools { display: flex; align-items: center; gap: 6px; }
 .zoom-tools .icon-tool { width: 34px; height: 34px; }
 .zoom-tools output { min-width: 42px; color: var(--muted); font-size: 11px; font-weight: 700; text-align: center; }
 .delete-button { height: 35px; padding: 0 10px; display: flex; align-items: center; gap: 5px; color: #a64331; border: 1px solid #e5c1b8; border-radius: 8px; background: transparent; font-size: 11px; font-weight: 700; cursor: pointer; }
 .delete-button svg { width: 16px; }
 .delete-button:disabled { opacity: .35; cursor: not-allowed; }
+.rotate-button { height: 35px; padding: 0 8px; display: flex; align-items: center; gap: 3px; color: #4f5868; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 10px; font-weight: 700; cursor: pointer; }
+.rotate-button span { font-size: 18px; line-height: 1; }
+.rotate-button:disabled { opacity: .35; cursor: not-allowed; }
 .privacy-note { display: flex; gap: 8px; margin: 28px 0 0; color: #7b827f; font-size: 10px; line-height: 1.6; }
 .privacy-note svg { flex: 0 0 auto; width: 15px; height: 15px; margin-top: 1px; color: #75907d; }
 
@@ -249,7 +252,7 @@ select { width: 100%; height: 41px; padding: 0 11px; color: var(--ink); border: 
   .empty-state h2 { font-size: 22px; }
   .empty-state p { font-size: 12px; }
   .pdf-pages { gap: 25px; }
-  .mobile-toolbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; height: calc(66px + env(safe-area-inset-bottom)); padding: 7px 8px env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); background: rgba(255,253,250,.98); box-shadow: 0 -8px 24px rgba(42,35,28,.08); }
+  .mobile-toolbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; height: calc(66px + env(safe-area-inset-bottom)); padding: 7px 6px env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--line); background: rgba(255,253,250,.98); box-shadow: 0 -8px 24px rgba(42,35,28,.08); }
   .mobile-toolbar button, .mobile-toolbar label { min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #4f5868; border: 0; background: transparent; font-size: 9px; font-weight: 700; }
   .mobile-toolbar button span, .mobile-toolbar label span { height: 25px; display: grid; place-items: center; color: var(--ink); font-size: 21px; font-weight: 500; }
   .mobile-toolbar button:disabled, .mobile-toolbar label[aria-disabled="true"] { opacity: .35; }
@@ -258,6 +261,10 @@ select { width: 100%; height: 41px; padding: 0 11px; color: var(--ink); border: 
   .mobile-color { position: relative; }
   .mobile-color span { width: 23px; height: 23px !important; border: 2px solid #fff; border-radius: 50%; background: #172033; box-shadow: 0 0 0 1px #bbb; }
   .mobile-color input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .mobile-size-control .mobile-size-field { width: 58px; height: 27px; display: flex; align-items: center; justify-content: center; gap: 2px; padding: 0 3px; border: 1px solid var(--line); border-radius: 7px; background: #fff; }
+  .mobile-size-field input { width: 35px; min-width: 0; padding: 0; color: var(--ink); border: 0; outline: 0; background: transparent; font-size: 16px; font-weight: 700; text-align: right; appearance: textfield; }
+  .mobile-size-field input::-webkit-inner-spin-button, .mobile-size-field input::-webkit-outer-spin-button { margin: 0; appearance: none; }
+  .mobile-size-field i { color: var(--muted); font-size: 8px; font-style: normal; }
   .drag-handle { top: -26px; height: 24px; font-size: 10px; }
   .toast { bottom: 80px; }
 }

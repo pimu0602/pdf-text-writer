@@ -2,8 +2,10 @@ import {
   configurePdfViewer,
   loadPdf,
   setZoom,
+  rotateClockwise,
   getScale,
   getPageInfo,
+  getAllPageInfo,
   getOriginalPdfBytes,
   getOriginalFileName,
   hasPdf
@@ -17,6 +19,7 @@ import {
   isAddMode,
   mountTextLayer,
   updateSelectedItem,
+  rotateTextItemsClockwise,
   deleteSelectedItem
 } from "./text-layer.js";
 import { exportPdf } from "./pdf-export.js";
@@ -33,6 +36,7 @@ const elements = {
   bold: document.querySelector("#boldButton"),
   align: document.querySelector("#alignSelect"),
   remove: document.querySelector("#deleteButton"),
+  rotate: document.querySelector("#rotateButton"),
   zoomOut: document.querySelector("#zoomOutButton"),
   zoomIn: document.querySelector("#zoomInButton"),
   zoomValue: document.querySelector("#zoomValue"),
@@ -41,9 +45,11 @@ const elements = {
   status: document.querySelector("#statusMessage"),
   toast: document.querySelector("#toast"),
   mobileAdd: document.querySelector("#mobileAddButton"),
-  mobileSize: document.querySelector("#mobileSizeButton"),
+  mobileSize: document.querySelector("#mobileFontSizeInput"),
+  mobileSizeControl: document.querySelector(".mobile-size-control"),
   mobileColorLabel: document.querySelector("#mobileColorLabel"),
   mobileColor: document.querySelector("#mobileColorInput"),
+  mobileRotate: document.querySelector("#mobileRotateButton"),
   mobileDelete: document.querySelector("#mobileDeleteButton")
 };
 
@@ -82,12 +88,14 @@ function syncSelection(item) {
   elements.align.disabled = !enabled;
   elements.remove.disabled = !enabled;
   elements.mobileSize.disabled = !enabled;
+  elements.mobileSizeControl.setAttribute("aria-disabled", String(!enabled));
   elements.mobileColor.disabled = !enabled;
   elements.mobileColorLabel.setAttribute("aria-disabled", String(!enabled));
   elements.mobileDelete.disabled = !enabled;
 
   if (!item) return;
   elements.fontSize.value = String(item.fontSize);
+  elements.mobileSize.value = String(item.fontSize);
   elements.color.value = item.color;
   elements.mobileColor.value = item.color;
   elements.colorValue.textContent = item.color.toUpperCase();
@@ -101,7 +109,9 @@ function setDocumentControls(enabled) {
   elements.add.disabled = !enabled || isBusy;
   elements.zoomIn.disabled = !enabled || isBusy;
   elements.zoomOut.disabled = !enabled || isBusy;
+  elements.rotate.disabled = !enabled || isBusy;
   elements.mobileAdd.disabled = !enabled || isBusy;
+  elements.mobileRotate.disabled = !enabled || isBusy;
   syncSelection(getSelectedItem());
 }
 
@@ -155,10 +165,14 @@ function toggleAddMode() {
 elements.add.addEventListener("click", toggleAddMode);
 elements.mobileAdd.addEventListener("click", toggleAddMode);
 
-elements.fontSize.addEventListener("change", () => {
-  const size = Math.min(120, Math.max(6, Number(elements.fontSize.value) || 16));
+function updateFontSize(value) {
+  const size = Math.min(120, Math.max(6, Number(value) || 16));
+  elements.fontSize.value = String(size);
+  elements.mobileSize.value = String(size);
   updateSelectedItem({ fontSize: size });
-});
+}
+elements.fontSize.addEventListener("change", () => updateFontSize(elements.fontSize.value));
+elements.mobileSize.addEventListener("change", () => updateFontSize(elements.mobileSize.value));
 
 function updateColor(value) {
   elements.color.value = value;
@@ -182,16 +196,6 @@ function removeSelected() {
 elements.remove.addEventListener("click", removeSelected);
 elements.mobileDelete.addEventListener("click", removeSelected);
 
-elements.mobileSize.addEventListener("click", () => {
-  const item = getSelectedItem();
-  if (!item) return;
-  const sizes = [10, 12, 14, 16, 18, 24, 32, 42];
-  const currentIndex = sizes.findIndex((size) => size > item.fontSize);
-  const nextSize = currentIndex >= 0 ? sizes[currentIndex] : sizes[0];
-  updateSelectedItem({ fontSize: nextSize });
-  showToast(`文字サイズ：${nextSize}pt`);
-});
-
 async function changeZoom(delta) {
   if (isBusy || !hasPdf()) return;
   isBusy = true;
@@ -209,6 +213,24 @@ async function changeZoom(delta) {
 elements.zoomIn.addEventListener("click", () => changeZoom(0.15));
 elements.zoomOut.addEventListener("click", () => changeZoom(-0.15));
 
+async function rotatePdf() {
+  if (isBusy || !hasPdf()) return;
+  isBusy = true;
+  setDocumentControls(false);
+  setStatus("PDFを右へ90度回転しています…");
+  try {
+    rotateTextItemsClockwise(getAllPageInfo());
+    await rotateClockwise();
+    setStatus("PDFを右へ90度回転しました");
+    showToast("全ページを右へ90度回転しました");
+  } finally {
+    isBusy = false;
+    setDocumentControls(true);
+  }
+}
+elements.rotate.addEventListener("click", rotatePdf);
+elements.mobileRotate.addEventListener("click", rotatePdf);
+
 elements.save.addEventListener("click", async () => {
   if (isBusy || !hasPdf()) return;
   isBusy = true;
@@ -217,6 +239,7 @@ elements.save.addEventListener("click", async () => {
     await exportPdf({
       sourceBytes: getOriginalPdfBytes(),
       textItems: getTextItems(),
+      pageInfoList: getAllPageInfo(),
       fileName: getOriginalFileName(),
       onProgress: setStatus
     });

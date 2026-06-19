@@ -32,9 +32,18 @@ function safeTextWidth(font, text, size) {
   catch { return text.length * size * 0.55; }
 }
 
-export async function exportPdf({ sourceBytes, textItems, fileName, onProgress }) {
+function screenPointToPdf(x, y, rotation, pageWidth, pageHeight) {
+  switch (rotation) {
+    case 90: return { x: y, y: x };
+    case 180: return { x: pageWidth - x, y };
+    case 270: return { x: pageWidth - y, y: pageHeight - x };
+    default: return { x, y: pageHeight - y };
+  }
+}
+
+export async function exportPdf({ sourceBytes, textItems, pageInfoList = [], fileName, onProgress }) {
   if (!window.PDFLib) throw new Error("PDF保存ライブラリを読み込めませんでした。");
-  const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
+  const { PDFDocument, StandardFonts, rgb, degrees } = window.PDFLib;
   const pdfDoc = await PDFDocument.load(sourceBytes.slice(0));
   const pages = pdfDoc.getPages();
   const usesJapanese = textItems.some((item) => needsCustomFont(item.text));
@@ -51,12 +60,20 @@ export async function exportPdf({ sourceBytes, textItems, fileName, onProgress }
   const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
+  pages.forEach((page, pageIndex) => {
+    const info = pageInfoList[pageIndex];
+    if (info) page.setRotation(degrees(info.rotation));
+  });
+
   for (const item of textItems) {
     const page = pages[item.pageIndex];
     if (!page || !item.text.trim()) continue;
 
     const font = needsCustomFont(item.text) ? customFont : (item.bold ? boldFont : regularFont);
     const { width: pageWidth, height: pageHeight } = page.getSize();
+    const rotation = pageInfoList[item.pageIndex]?.rotation ?? page.getRotation().angle ?? 0;
+    const displayWidth = rotation % 180 === 0 ? pageWidth : pageHeight;
+    const displayHeight = rotation % 180 === 0 ? pageHeight : pageWidth;
     const size = Math.max(6, Number(item.fontSize) || 16);
     const lineHeight = size * 1.32;
     const color = hexToRgb(item.color || "#172033");
@@ -67,10 +84,18 @@ export async function exportPdf({ sourceBytes, textItems, fileName, onProgress }
       let offset = 0;
       if (item.align === "center") offset = (item.width - lineWidth) / 2;
       if (item.align === "right") offset = item.width - lineWidth;
-      const x = Math.max(0, Math.min(item.x + offset, pageWidth));
-      const y = pageHeight - item.y - size - (lineIndex * lineHeight);
-      if (y < -lineHeight || y > pageHeight) return;
-      page.drawText(line, { x, y, size, font, color: rgb(color.r, color.g, color.b) });
+      const screenX = Math.max(0, Math.min(item.x + offset, displayWidth));
+      const screenY = item.y + size + (lineIndex * lineHeight);
+      if (screenY < -lineHeight || screenY > displayHeight + lineHeight) return;
+      const point = screenPointToPdf(screenX, screenY, rotation, pageWidth, pageHeight);
+      page.drawText(line, {
+        x: point.x,
+        y: point.y,
+        size,
+        font,
+        color: rgb(color.r, color.g, color.b),
+        rotate: degrees(rotation)
+      });
     });
   }
 
@@ -87,8 +112,9 @@ export async function exportPdf({ sourceBytes, textItems, fileName, onProgress }
   anchor.click();
   anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+  const rotations = pages.map((page) => page.getRotation().angle);
   window.dispatchEvent(new CustomEvent("pdf-text-writer:exported", {
-    detail: { byteLength: outputBytes.length, fileName: outputFileName }
+    detail: { byteLength: outputBytes.length, fileName: outputFileName, rotations }
   }));
-  return { byteLength: outputBytes.length, fileName: outputFileName };
+  return { byteLength: outputBytes.length, fileName: outputFileName, rotations };
 }
