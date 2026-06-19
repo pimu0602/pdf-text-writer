@@ -58,11 +58,11 @@
 
       <div class="property-row">
         <div class="property-group color-group">
-          <label for="fontColorInput">文字色</label>
-          <div class="color-field">
-            <input id="fontColorInput" type="color" value="#172033" disabled>
+          <span id="colorFieldLabel" class="field-label">文字色</span>
+          <button id="colorPickerButton" class="color-field" type="button" disabled aria-labelledby="colorFieldLabel" aria-haspopup="dialog">
+            <span id="colorSwatch" class="color-swatch"></span>
             <span id="colorValue">#172033</span>
-          </div>
+          </button>
         </div>
         <div class="property-group">
           <span class="field-label">太字</span>
@@ -136,10 +136,27 @@
       <span class="mobile-size-field"><input id="mobileFontSizeInput" type="number" min="6" max="120" step="1" value="16" disabled><i>pt</i></span>
       文字サイズ
     </label>
-    <label id="mobileColorLabel" class="mobile-color" aria-disabled="true"><span></span>文字色<input id="mobileColorInput" type="color" value="#172033" disabled></label>
+    <button id="mobileColorButton" class="mobile-color" type="button" disabled><span id="mobileColorSwatch"></span>文字色</button>
     <button id="mobileRotateButton" type="button" disabled><span>↻</span>回転</button>
     <button id="mobileDeleteButton" type="button" disabled><span>⌫</span>削除</button>
   </nav>
+
+  <dialog id="colorDialog" class="color-dialog" aria-labelledby="colorDialogTitle">
+    <div class="color-dialog-header">
+      <div>
+        <span class="eyebrow">TEXT COLOR</span>
+        <h2 id="colorDialogTitle">文字色を選択</h2>
+      </div>
+      <button id="colorDialogClose" class="dialog-close" type="button" aria-label="閉じる">×</button>
+    </div>
+    <div id="colorPalette" class="color-palette" role="grid" aria-label="カラーパレット"></div>
+    <div class="custom-color-row">
+      <span id="customColorPreview" class="custom-color-preview" aria-hidden="true"></span>
+      <label for="colorHexInput">カラーコード</label>
+      <input id="colorHexInput" type="text" value="#172033" maxlength="7" inputmode="text" autocomplete="off" spellcheck="false">
+      <button id="applyColorButton" class="button button-primary" type="button">適用</button>
+    </div>
+  </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 

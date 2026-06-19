@@ -122,6 +122,18 @@ export async function setZoom(nextScale) {
 export async function rotateClockwise() {
   if (!pdfDocument) return;
   pageRotations = pageRotations.map((rotation) => (rotation + 90) % 360);
+
+  if (window.matchMedia("(max-width: 760px)").matches) {
+    let widestPage = 0;
+    for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+      const page = await pdfDocument.getPage(pageNumber);
+      const rotation = ((page.rotate + pageRotations[pageNumber - 1]) % 360 + 360) % 360;
+      widestPage = Math.max(widestPage, page.getViewport({ scale: 1, rotation }).width);
+    }
+    const usableWidth = Math.max(280, viewerElement.clientWidth - 28);
+    currentScale = Math.min(1.35, Math.max(0.3, usableWidth / widestPage));
+  }
+
   await renderPdfPages();
 }
 
