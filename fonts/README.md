@@ -1,11 +1,9 @@
 # 日本語フォント
 
-初期版は、保存時に Noto Sans JP をCDNから読み込み、PDFへサブセット埋め込みします。
+PDF保存には、静的TTF形式のIPAexゴシック Ver.004.01（`ipaexg.ttf`）を使用します。
 
-完全オフラインで利用する場合は、利用条件を確認した日本語対応フォントをこのフォルダーへ配置し、`js/pdf-export.js` の `JAPANESE_FONT_URL` をローカルパスへ変更してください。
+- 配布元: https://moji.or.jp/ipafont/ipaex00401/
+- ライセンス: IPAフォントライセンスv1.0
+- ライセンス原文: `IPA_Font_License_Agreement_v1.0.txt`
 
-例：
-
-```js
-const JAPANESE_FONT_URL = "./fonts/japanese-font.ttf";
-```
+ブラウザ上のPDFへ使用文字だけをサブセット埋め込みするため、元のフォントサイズがそのまま出力PDFへ加算されることはありません。

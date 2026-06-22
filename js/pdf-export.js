@@ -1,5 +1,5 @@
 const JAPANESE_FONT_URL =
-  "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-jp@5.2.6/files/noto-sans-jp-japanese-400-normal.woff";
+  "./fonts/ipaexg.ttf";
 
 let cachedJapaneseFontBytes = null;
 

@@ -1,7 +1,9 @@
-import { mkdir, readdir, rm } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 
 const debuggerBase = "http://127.0.0.1:9222";
 const downloadPath = "C:/tmp/pdf-text-writer-downloads";
+const renderedPdfPath = "C:/tmp/pdf-text-writer-long-japanese.pdf";
+const renderedPngPath = "C:/tmp/pdf-text-writer-long-japanese.png";
 
 await mkdir(downloadPath, { recursive: true });
 for (const file of await readdir(downloadPath)) {
@@ -404,8 +406,28 @@ if (!rotationPassed) {
 }
 await send("Emulation.clearDeviceMetricsOverride");
 
+const longJapaneseText = "GRBL-11のB3ブロックを担当し、ソフト設計、装置立ち上げ、デバッグ、検収対応まで一貫して対応した。機器仕様と通信仕様を確認しながら実装を進め、測定値を装置側で扱える状態まで対応した。";
 await evaluate(`(() => {
+  const size = document.querySelector('#fontSizeInput');
+  size.value = '12';
+  size.dispatchEvent(new Event('change', { bubbles: true }));
+  const editable = document.querySelector('.text-box-content');
+  editable.innerText = ${JSON.stringify(longJapaneseText)};
+  editable.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
   window.__pdfTextWriterExport = null;
+  window.__pdfTextWriterExportBase64 = null;
+  const originalCreateObjectURL = URL.createObjectURL.bind(URL);
+  URL.createObjectURL = (blob) => {
+    blob.arrayBuffer().then((buffer) => {
+      const bytes = new Uint8Array(buffer);
+      const chunks = [];
+      for (let offset = 0; offset < bytes.length; offset += 32768) {
+        chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 32768)));
+      }
+      window.__pdfTextWriterExportBase64 = btoa(chunks.join(''));
+    });
+    return originalCreateObjectURL(blob);
+  };
   window.addEventListener('pdf-text-writer:exported', (event) => {
     window.__pdfTextWriterExport = event.detail;
   }, { once: true });
@@ -431,10 +453,42 @@ for (let attempt = 0; attempt < 40; attempt += 1) {
   await new Promise((resolve) => setTimeout(resolve, 250));
 }
 const exportMeta = await evaluate("window.__pdfTextWriterExport");
-if (!exportMeta || exportMeta.byteLength < 500 || exportMeta.fileName !== "smoke-sample-text.pdf" ||
+if (!exportMeta || exportMeta.byteLength < 10000 || exportMeta.fileName !== "smoke-sample-text.pdf" ||
     exportMeta.rotations?.[0] !== 180) {
   throw new Error(`PDFバイト列を確認できません: ${JSON.stringify(exportMeta)}`);
 }
+
+await waitFor("Boolean(window.__pdfTextWriterExportBase64)", 60000);
+const savedPdfBase64 = await evaluate("window.__pdfTextWriterExportBase64");
+await writeFile(renderedPdfPath, Buffer.from(savedPdfBase64, "base64"));
+const renderedPdfState = await evaluate(`(async () => {
+  const binary = atob(window.__pdfTextWriterExportBase64);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+  const page = await pdf.getPage(1);
+  const textContent = await page.getTextContent();
+  const viewport = page.getViewport({ scale: 1.5 });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  canvas.style.background = '#fff';
+  document.body.replaceChildren(canvas);
+  document.body.style.margin = '0';
+  document.body.style.background = '#fff';
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  return {
+    text: textContent.items.map((item) => item.str).join(''),
+    width: canvas.width,
+    height: canvas.height
+  };
+})()`);
+if (!renderedPdfState.text.includes("担当") || !renderedPdfState.text.includes("検収対応") ||
+    !renderedPdfState.text.includes("測定値") || !renderedPdfState.text.includes("状態まで対応した。") ||
+    renderedPdfState.text.length < longJapaneseText.length) {
+  throw new Error(`保存PDFの日本語が欠落しています: ${JSON.stringify(renderedPdfState)}`);
+}
+const screenshot = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
+await writeFile(renderedPngPath, Buffer.from(screenshot.data, "base64"));
 
 console.log(JSON.stringify({
   result: "PASS",
@@ -447,6 +501,9 @@ console.log(JSON.stringify({
   mobileRotationPassed,
   rotationPassed,
   exportMeta,
+  renderedPdfState,
+  renderedPdfPath,
+  renderedPngPath,
   download: downloads[0] || "headless-browser-policy-blocked"
 }, null, 2));
 
