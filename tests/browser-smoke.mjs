@@ -203,6 +203,69 @@ if (editorState.text !== "山田太郎" || editorState.fontSize !== "20" || edit
   throw new Error(`編集状態が一致しません: ${JSON.stringify(editorState)}`);
 }
 
+const textRangeState = await evaluate(`(() => {
+  const editable = document.querySelector('.text-box-content');
+  const box = editable.closest('.text-box');
+  const resizeHandle = box.querySelector('.resize-handle');
+  const shortHeight = box.offsetHeight;
+  editable.innerText = '長文を入力したときにテキスト枠が内容に合わせて自動的に伸びることを確認するための文章です。';
+  editable.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+  const longHeight = box.offsetHeight;
+  const widthBefore = parseFloat(box.style.width);
+  const rect = resizeHandle.getBoundingClientRect();
+  resizeHandle.dispatchEvent(new PointerEvent('pointerdown', {
+    bubbles: true,
+    pointerId: 25,
+    pointerType: 'mouse',
+    button: 0,
+    buttons: 1,
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2
+  }));
+  resizeHandle.dispatchEvent(new PointerEvent('pointermove', {
+    bubbles: true,
+    pointerId: 25,
+    pointerType: 'mouse',
+    buttons: 1,
+    clientX: rect.left - 60,
+    clientY: rect.top + rect.height / 2
+  }));
+  resizeHandle.dispatchEvent(new PointerEvent('pointerup', {
+    bubbles: true,
+    pointerId: 25,
+    pointerType: 'mouse',
+    button: 0,
+    buttons: 0,
+    clientX: rect.left - 60,
+    clientY: rect.top + rect.height / 2
+  }));
+  const widthAfter = parseFloat(box.style.width);
+  const resizedHeight = box.offsetHeight;
+  editable.innerText = '山田太郎';
+  editable.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+  return {
+    shortHeight,
+    longHeight,
+    resizedHeight,
+    restoredHeight: box.offsetHeight,
+    widthBefore,
+    widthAfter,
+    handleVisible: getComputedStyle(resizeHandle).display !== 'none'
+  };
+})()`);
+const wrappedLines = await evaluate(`(async () => {
+  const { wrapTextLines } = await import('./js/pdf-export.js');
+  const font = { widthOfTextAtSize: (text, size) => Array.from(text).length * size };
+  return wrapTextLines(font, '123456789', 10, 30);
+})()`);
+if (textRangeState.longHeight <= textRangeState.shortHeight ||
+    textRangeState.widthAfter >= textRangeState.widthBefore ||
+    textRangeState.resizedHeight < textRangeState.longHeight ||
+    textRangeState.restoredHeight >= textRangeState.resizedHeight ||
+    !textRangeState.handleVisible || wrappedLines.length !== 3) {
+  throw new Error(`長文・文字範囲の検証に失敗しました: ${JSON.stringify({ textRangeState, wrappedLines })}`);
+}
+
 await send("Emulation.setDeviceMetricsOverride", {
   width: 390,
   height: 844,
@@ -374,6 +437,8 @@ if (!exportMeta || exportMeta.byteLength < 500 || exportMeta.fileName !== "smoke
 console.log(JSON.stringify({
   result: "PASS",
   editorState,
+  textRangeState,
+  wrappedLines,
   mobileScrollState,
   mobileSizeState,
   mobileColorState,

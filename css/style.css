@@ -212,10 +212,10 @@ select { width: 100%; height: 41px; padding: 0 11px; color: var(--ink); border: 
 .page-label { position: absolute; top: -21px; left: 0; color: #747a78; font-size: 9px; font-weight: 700; letter-spacing: .6px; }
 .text-edit-layer { position: absolute; inset: 0; overflow: hidden; touch-action: none; }
 .text-edit-layer.add-mode { cursor: crosshair; background: rgba(223, 95, 63, .025); }
-.text-box { position: absolute; min-height: 25px; display: flex; align-items: flex-start; border: 1px solid transparent; border-radius: 3px; cursor: move; touch-action: none; }
+.text-box { position: absolute; min-height: 25px; height: auto; display: flex; align-items: flex-start; border: 1px solid transparent; border-radius: 3px; cursor: move; touch-action: none; }
 .text-box:hover { border-color: rgba(223, 95, 63, .38); }
 .text-box.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(223, 95, 63, .12); background: rgba(255,255,255,.45); }
-.text-box-content { width: 100%; min-width: 28px; min-height: 1.35em; padding: 2px 4px; outline: 0; cursor: move; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.32; }
+.text-box-content { width: 100%; min-width: 28px; min-height: 1.35em; height: auto; padding: 2px 4px; outline: 0; cursor: move; white-space: pre-wrap; overflow: visible; overflow-wrap: anywhere; line-height: 1.32; }
 .text-box-content:focus { cursor: text; }
 .text-box.dragging { opacity: .86; cursor: grabbing; user-select: none; }
 .text-box.dragging .text-box-content { cursor: grabbing; user-select: none; }
@@ -223,6 +223,8 @@ select { width: 100%; height: 41px; padding: 0 11px; color: var(--ink); border: 
 .drag-handle::before { content: "✥"; font-size: 10px; }
 .drag-handle:active { cursor: grabbing; }
 .text-box.selected .drag-handle { display: flex; }
+.resize-handle { position: absolute; top: 50%; right: -9px; width: 18px; height: 34px; display: none; align-items: center; justify-content: center; padding: 0; color: #fff; border: 2px solid #fff; border-radius: 9px; background: var(--accent); box-shadow: 0 2px 7px rgba(32,43,67,.2); cursor: ew-resize; font-size: 10px; line-height: 1; touch-action: none; transform: translateY(-50%); }
+.text-box.selected .resize-handle { display: flex; }
 
 .loading-overlay { min-height: 55vh; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
 .loading-overlay::before { content: ""; width: 27px; height: 27px; margin: 0 auto 12px; display: block; border: 3px solid #d6d0c7; border-top-color: var(--accent); border-radius: 50%; animation: spin .75s linear infinite; }
@@ -253,7 +255,7 @@ select { width: 100%; height: 41px; padding: 0 11px; color: var(--ink); border: 
   .empty-state p { font-size: 12px; }
   .pdf-pages { gap: 25px; }
   .text-edit-layer, .text-box, .text-box-content { touch-action: pan-x pan-y; }
-  .drag-handle { touch-action: none; }
+  .drag-handle, .resize-handle { touch-action: none; }
   .mobile-toolbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; height: calc(66px + env(safe-area-inset-bottom)); padding: 7px 4px env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--line); background: rgba(255,253,250,.98); box-shadow: 0 -8px 24px rgba(42,35,28,.08); }
   .mobile-toolbar button, .mobile-toolbar label { min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #4f5868; border: 0; background: transparent; font-size: 9px; font-weight: 700; }
   .mobile-toolbar button span, .mobile-toolbar label span { height: 25px; display: grid; place-items: center; color: var(--ink); font-size: 21px; font-weight: 500; }
@@ -268,6 +270,7 @@ select { width: 100%; height: 41px; padding: 0 11px; color: var(--ink); border: 
   .mobile-size-field input::-webkit-inner-spin-button, .mobile-size-field input::-webkit-outer-spin-button { margin: 0; appearance: none; }
   .mobile-size-field i { color: var(--muted); font-size: 8px; font-style: normal; }
   .drag-handle { top: -26px; height: 24px; font-size: 10px; }
+  .resize-handle { right: -11px; width: 22px; height: 40px; border-radius: 11px; }
   .toast { bottom: 80px; }
 }
 

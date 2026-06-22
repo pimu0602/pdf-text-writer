@@ -64,7 +64,8 @@ export function mountTextLayer(layer, pageIndex) {
       text: "テキストを入力",
       x,
       y,
-      width: Math.min(180, Math.max(90, page.pdfWidth - x)),
+      width: Math.min(180, Math.max(40, page.pdfWidth - x)),
+      height: 26,
       fontSize: 16,
       color: "#172033",
       bold: false,
@@ -95,8 +96,16 @@ export function mountTextLayer(layer, pageIndex) {
 function renderPageItems(layer, pageIndex) {
   layer.querySelectorAll(".text-box").forEach((element) => element.remove());
   textItems.filter((item) => item.pageIndex === pageIndex).forEach((item) => {
-    layer.append(createTextBox(item));
+    const box = createTextBox(item);
+    layer.append(box);
+    syncItemHeight(item, box);
   });
+}
+
+function syncItemHeight(item, box) {
+  const scale = getScale();
+  if (!scale || !box.isConnected) return;
+  item.height = Math.max(item.fontSize * 1.32, box.offsetHeight / scale);
 }
 
 function createTextBox(item) {
@@ -118,6 +127,12 @@ function createTextBox(item) {
   handle.textContent = "移動";
   handle.setAttribute("aria-label", "テキストを移動");
 
+  const resizeHandle = document.createElement("button");
+  resizeHandle.type = "button";
+  resizeHandle.className = "resize-handle";
+  resizeHandle.textContent = "↔";
+  resizeHandle.setAttribute("aria-label", "文字範囲の横幅を調整");
+
   const editable = document.createElement("div");
   editable.className = "text-box-content";
   editable.contentEditable = "true";
@@ -129,7 +144,7 @@ function createTextBox(item) {
   box.addEventListener("pointerdown", (event) => {
     event.stopPropagation();
     selectItem(item.id);
-    if (event.pointerType === "mouse" && event.button === 0 && !event.target.closest(".drag-handle")) {
+    if (event.pointerType === "mouse" && event.button === 0 && !event.target.closest(".drag-handle, .resize-handle")) {
       startDirectDragging(event, item, box, editable);
     }
   });
@@ -140,14 +155,16 @@ function createTextBox(item) {
   editable.addEventListener("blur", restoreMobileViewport);
   editable.addEventListener("input", () => {
     item.text = editable.innerText.replace(/\r/g, "");
+    syncItemHeight(item, box);
     onItemsChanged(textItems);
   });
   editable.addEventListener("keydown", (event) => {
     if (event.key === "Escape") editable.blur();
   });
   handle.addEventListener("pointerdown", (event) => startDragging(event, item, box));
+  resizeHandle.addEventListener("pointerdown", (event) => startResizing(event, item, box));
 
-  box.append(handle, editable);
+  box.append(handle, editable, resizeHandle);
   return box;
 }
 
@@ -220,7 +237,7 @@ function startDirectDragging(event, item, box, editable) {
     moveEvent.preventDefault();
     const scale = getScale();
     item.x = Math.max(0, Math.min(originX + deltaX / scale, page.pdfWidth - item.width));
-    item.y = Math.max(0, Math.min(originY + deltaY / scale, page.pdfHeight - item.fontSize * 1.4));
+    item.y = Math.max(0, Math.min(originY + deltaY / scale, page.pdfHeight - (item.height || item.fontSize * 1.4)));
     box.style.left = `${item.x * scale}px`;
     box.style.top = `${item.y * scale}px`;
   };
@@ -247,7 +264,8 @@ function startDragging(event, item, box) {
   const originY = item.y;
   const page = getPageInfo(item.pageIndex);
   const pointerId = event.pointerId;
-  event.currentTarget.setPointerCapture(pointerId);
+  const target = event.currentTarget;
+  try { target.setPointerCapture(pointerId); } catch { /* synthetic or interrupted pointer */ }
 
   const move = (moveEvent) => {
     if (moveEvent.pointerId !== pointerId) return;
@@ -257,21 +275,61 @@ function startDragging(event, item, box) {
     }
     const scale = getScale();
     item.x = Math.max(0, Math.min(originX + (moveEvent.clientX - startX) / scale, page.pdfWidth - item.width));
-    item.y = Math.max(0, Math.min(originY + (moveEvent.clientY - startY) / scale, page.pdfHeight - item.fontSize * 1.4));
+    item.y = Math.max(0, Math.min(originY + (moveEvent.clientY - startY) / scale, page.pdfHeight - (item.height || item.fontSize * 1.4)));
     box.style.left = `${item.x * scale}px`;
     box.style.top = `${item.y * scale}px`;
   };
   const end = () => {
-    event.currentTarget.removeEventListener("pointermove", move);
-    event.currentTarget.removeEventListener("pointerup", end);
-    event.currentTarget.removeEventListener("pointercancel", end);
+    target.removeEventListener("pointermove", move);
+    target.removeEventListener("pointerup", end);
+    target.removeEventListener("pointercancel", end);
     onSelectionChanged({ ...item });
     onItemsChanged(textItems);
   };
 
-  event.currentTarget.addEventListener("pointermove", move);
-  event.currentTarget.addEventListener("pointerup", end);
-  event.currentTarget.addEventListener("pointercancel", end);
+  target.addEventListener("pointermove", move);
+  target.addEventListener("pointerup", end);
+  target.addEventListener("pointercancel", end);
+}
+
+function startResizing(event, item, box) {
+  event.preventDefault();
+  event.stopPropagation();
+  selectItem(item.id);
+  const target = event.currentTarget;
+  const pointerId = event.pointerId;
+  const startX = event.clientX;
+  const originWidth = item.width;
+  const page = getPageInfo(item.pageIndex);
+  try { target.setPointerCapture(pointerId); } catch { /* synthetic or interrupted pointer */ }
+
+  const move = (moveEvent) => {
+    if (moveEvent.pointerId !== pointerId) return;
+    if (moveEvent.pointerType === "mouse" && moveEvent.buttons === 0) {
+      end();
+      return;
+    }
+    moveEvent.preventDefault();
+    const scale = getScale();
+    const availableWidth = Math.max(20, page.pdfWidth - item.x);
+    const minWidth = Math.min(60, availableWidth);
+    item.width = Math.max(minWidth, Math.min(originWidth + (moveEvent.clientX - startX) / scale, availableWidth));
+    box.style.width = `${item.width * scale}px`;
+    syncItemHeight(item, box);
+  };
+
+  const end = () => {
+    target.removeEventListener("pointermove", move);
+    target.removeEventListener("pointerup", end);
+    target.removeEventListener("pointercancel", end);
+    syncItemHeight(item, box);
+    onSelectionChanged({ ...item });
+    onItemsChanged(textItems);
+  };
+
+  target.addEventListener("pointermove", move, { passive: false });
+  target.addEventListener("pointerup", end);
+  target.addEventListener("pointercancel", end);
 }
 
 export function selectItem(id) {
@@ -297,7 +355,7 @@ export function rotateTextItemsClockwise(pageInfoList) {
     const page = pageInfoList[item.pageIndex];
     if (!page) return;
 
-    const textHeight = item.fontSize * 1.32;
+    const textHeight = item.height || item.fontSize * 1.32;
     const centerX = item.x + item.width / 2;
     const centerY = item.y + textHeight / 2;
     const nextPageWidth = page.pdfHeight;

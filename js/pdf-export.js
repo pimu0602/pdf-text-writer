@@ -32,6 +32,26 @@ function safeTextWidth(font, text, size) {
   catch { return text.length * size * 0.55; }
 }
 
+export function wrapTextLines(font, text, size, maxWidth) {
+  const width = Math.max(size, Number(maxWidth) || size);
+  return text.replace(/\r/g, "").split("\n").flatMap((paragraph) => {
+    if (!paragraph) return [""];
+    const lines = [];
+    let current = "";
+    for (const character of Array.from(paragraph)) {
+      const candidate = current + character;
+      if (current && safeTextWidth(font, candidate, size) > width) {
+        lines.push(current);
+        current = character;
+      } else {
+        current = candidate;
+      }
+    }
+    lines.push(current);
+    return lines;
+  });
+}
+
 function screenPointToPdf(x, y, rotation, pageWidth, pageHeight) {
   switch (rotation) {
     case 90: return { x: y, y: x };
@@ -77,7 +97,7 @@ export async function exportPdf({ sourceBytes, textItems, pageInfoList = [], fil
     const size = Math.max(6, Number(item.fontSize) || 16);
     const lineHeight = size * 1.32;
     const color = hexToRgb(item.color || "#172033");
-    const lines = item.text.replace(/\r/g, "").split("\n");
+    const lines = wrapTextLines(font, item.text, size, item.width);
 
     lines.forEach((line, lineIndex) => {
       const lineWidth = safeTextWidth(font, line, size);
