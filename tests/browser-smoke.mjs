@@ -208,10 +208,11 @@ const textRangeState = await evaluate(`(() => {
   const box = editable.closest('.text-box');
   const resizeHandle = box.querySelector('.resize-handle');
   const shortHeight = box.offsetHeight;
+  const shortWidth = parseFloat(box.style.width);
   editable.innerText = '長文を入力したときにテキスト枠が内容に合わせて自動的に伸びることを確認するための文章です。';
   editable.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
   const longHeight = box.offsetHeight;
-  const widthBefore = parseFloat(box.style.width);
+  const autoWidth = parseFloat(box.style.width);
   const rect = resizeHandle.getBoundingClientRect();
   resizeHandle.dispatchEvent(new PointerEvent('pointerdown', {
     bubbles: true,
@@ -248,7 +249,8 @@ const textRangeState = await evaluate(`(() => {
     longHeight,
     resizedHeight,
     restoredHeight: box.offsetHeight,
-    widthBefore,
+    shortWidth,
+    autoWidth,
     widthAfter,
     handleVisible: getComputedStyle(resizeHandle).display !== 'none'
   };
@@ -258,8 +260,8 @@ const wrappedLines = await evaluate(`(async () => {
   const font = { widthOfTextAtSize: (text, size) => Array.from(text).length * size };
   return wrapTextLines(font, '123456789', 10, 30);
 })()`);
-if (textRangeState.longHeight <= textRangeState.shortHeight ||
-    textRangeState.widthAfter >= textRangeState.widthBefore ||
+if (textRangeState.autoWidth <= textRangeState.shortWidth ||
+    textRangeState.widthAfter >= textRangeState.autoWidth ||
     textRangeState.resizedHeight < textRangeState.longHeight ||
     textRangeState.restoredHeight >= textRangeState.resizedHeight ||
     !textRangeState.handleVisible || wrappedLines.length !== 3) {

@@ -10,6 +10,7 @@ const viewportMeta = document.querySelector('meta[name="viewport"]');
 const defaultViewportContent = viewportMeta?.getAttribute("content") || "width=device-width, initial-scale=1";
 let mobileViewportLocked = false;
 let viewportRestoreTimer = null;
+const textMeasureCanvas = document.createElement("canvas");
 
 export function configureTextLayer(options) {
   getScale = options.getScale;
@@ -66,6 +67,7 @@ export function mountTextLayer(layer, pageIndex) {
       y,
       width: Math.min(180, Math.max(40, page.pdfWidth - x)),
       height: 26,
+      manualWidth: false,
       fontSize: 16,
       color: "#172033",
       bold: false,
@@ -98,8 +100,29 @@ function renderPageItems(layer, pageIndex) {
   textItems.filter((item) => item.pageIndex === pageIndex).forEach((item) => {
     const box = createTextBox(item);
     layer.append(box);
+    autoGrowWidth(item, box, box.querySelector(".text-box-content"));
     syncItemHeight(item, box);
   });
+}
+
+function autoGrowWidth(item, box, editable) {
+  if (item.manualWidth || !editable) return;
+  const scale = getScale();
+  const page = getPageInfo(item.pageIndex);
+  const context = textMeasureCanvas.getContext("2d");
+  if (!scale || !page || !context) return;
+
+  context.font = getComputedStyle(editable).font;
+  const widestLine = item.text.replace(/\r/g, "").split("\n").reduce(
+    (widest, line) => Math.max(widest, context.measureText(line || " ").width),
+    0
+  );
+  const availableWidth = Math.max(20, page.pdfWidth - item.x);
+  const requiredWidth = (widestLine + 10) / scale;
+  const nextWidth = Math.min(availableWidth, Math.max(item.width, requiredWidth));
+  if (nextWidth <= item.width) return;
+  item.width = nextWidth;
+  box.style.width = `${item.width * scale}px`;
 }
 
 function syncItemHeight(item, box) {
@@ -155,6 +178,7 @@ function createTextBox(item) {
   editable.addEventListener("blur", restoreMobileViewport);
   editable.addEventListener("input", () => {
     item.text = editable.innerText.replace(/\r/g, "");
+    autoGrowWidth(item, box, editable);
     syncItemHeight(item, box);
     onItemsChanged(textItems);
   });
@@ -313,6 +337,7 @@ function startResizing(event, item, box) {
     const scale = getScale();
     const availableWidth = Math.max(20, page.pdfWidth - item.x);
     const minWidth = Math.min(60, availableWidth);
+    item.manualWidth = true;
     item.width = Math.max(minWidth, Math.min(originWidth + (moveEvent.clientX - startX) / scale, availableWidth));
     box.style.width = `${item.width * scale}px`;
     syncItemHeight(item, box);
